@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ritten & Afspraken Planner</title>
+    <!-- jsPDF bibliotheek voor het genereren van PDF's -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; padding: 15px; }
         .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
@@ -27,6 +29,7 @@
         .btn-extra { background-color: #17a2b8; }
         .btn-add { background-color: #007bff; width: auto; padding: 10px 15px; }
         .btn-save { background-color: #6f42c1; font-size: 18px; padding: 15px; margin-top: 15px; }
+        .btn-pdf { background-color: #dc3545; font-size: 16px; padding: 12px; margin-bottom: 15px; }
         .btn-edit { background-color: #ffc107; color: #333; padding: 6px 10px; font-size: 13px; width: auto; }
         .btn-del { background-color: #dc3545; padding: 6px 10px; font-size: 13px; width: auto; }
         .btn-done { background-color: #28a745; color: white; padding: 6px 10px; font-size: 13px; width: auto; }
@@ -129,6 +132,23 @@
     <!-- TAB 3: HISTORIE -->
     <div id="historieTab" class="tab-content">
         <h2>Voltooide Ritten (Historie)</h2>
+
+        <!-- Periode selectie voor PDF -->
+        <div class="card" style="background: #e9ecef; border: 1px solid #ced4da;">
+            <label style="margin-bottom: 8px; color: #333;">Selecteer Periode voor PDF:</label>
+            <div class="row">
+                <div class="form-group" style="margin-bottom: 8px;">
+                    <label style="font-size: 12px;">Van:</label>
+                    <input type="date" id="pdfStartDatum">
+                </div>
+                <div class="form-group" style="margin-bottom: 8px;">
+                    <label style="font-size: 12px;">Tot:</label>
+                    <input type="date" id="pdfEindDatum">
+                </div>
+            </div>
+            <button type="button" class="btn-pdf" onclick="genereerPDF()">📥 Exporteer Historie als PDF</button>
+        </div>
+
         <div id="historieLijst">Historie ophalen...</div>
     </div>
 </div>
@@ -179,6 +199,7 @@
     const webhookUrl = 'https://script.google.com/macros/s/AKfycbzgds2s1CVu61suyGbl7bT9OWd8QbJchr-tKEKJG3UMOkl1gAdpYkPLLrwOW_qIUv0Q/exec';
     let extraAdresTeller = 0;
     let globaleRittenData = [];
+    let voltooideCache = [];
 
     function wisselTab(tabId, element) {
         document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
@@ -395,15 +416,15 @@
             const res = await fetch(webhookUrl);
             const alleRitten = await res.json();
 
-            const voltooideRitten = alleRitten.filter(rit => rit.status === 'Voltooid');
+            voltooideCache = alleRitten.filter(rit => rit.status === 'Voltooid');
 
-            if (voltooideRitten.length === 0) {
+            if (voltooideCache.length === 0) {
                 lijstDiv.innerText = "Geen voltooide ritten in de historie.";
                 return;
             }
 
             let html = '';
-            voltooideRitten.forEach((rit) => {
+            voltooideCache.forEach((rit) => {
                 let netDatum = meesFormattedDatum(rit.afspraakDatumTijd);
                 html += `
                     <div class="rit-item historie">
@@ -427,6 +448,73 @@
         } catch (e) {
             lijstDiv.innerText = "Fout bij laden historie: " + e.message;
         }
+    }
+
+    // PDF GENERATOR FUNCTIE
+    function genereerPDF() {
+        const startVal = document.getElementById('pdfStartDatum').value;
+        const eindVal = document.getElementById('pdfEindDatum').value;
+
+        if (!startVal || !eindVal) {
+            alert("Selecteer eerst een 'Van' en 'Tot' datum voor de periode.");
+            return;
+        }
+
+        const startDate = new Date(startVal);
+        startDate.setHours(0,0,0,0);
+        const endDate = new Date(eindVal);
+        endDate.setHours(23,59,59,999);
+
+        // Filter voltooide ritten binnen de periode
+        const gefilterd = voltooideCache.filter(rit => {
+            if (!rit.afspraakDatumTijd) return false;
+            const ritDatum = new Date(rit.afspraakDatumTijd);
+            return ritDatum >= startDate && ritDatum <= endDate;
+        });
+
+        if (gefilterd.length === 0) {
+            alert("Geen voltooide ritten gevonden in de geselecteerde periode.");
+            return;
+        }
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(18);
+        doc.text("Ritten Historie Overzicht", 14, 20);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(11);
+        doc.text(`Periode: ${startVal} t/m ${eindVal}`, 14, 28);
+        doc.text(`Totaal aantal ritten: ${gefilterd.length}`, 14, 34);
+
+        let y = 45;
+        gefilterd.forEach((rit, index) => {
+            if (y > 270) {
+                doc.addPage();
+                y = 20;
+            }
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(12);
+            doc.text(`${index + 1}. Bedrijf: ${rit.bedrijf || 'Onbekend'}`, 14, y);
+            
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            doc.text(`Gepland: ${meesFormattedDatum(rit.afspraakDatumTijd)}`, 14, y + 6);
+            doc.text(`Start: ${rit.startDatumTijd || '-'} | ${rit.haalAdres || '-'}`, 14, y + 12);
+            doc.text(`Extra: ${rit.extraAdressen || '-'}`, 14, y + 18);
+            doc.text(`Stop: ${rit.stopDatumTijd || '-'} | ${rit.brengAdres || '-'}`, 14, y + 24);
+            doc.text(`Notitie: ${rit.opmerkingen || '-'}`, 14, y + 30);
+
+            doc.setDrawColor(200, 200, 200);
+            doc.line(14, y + 34, 196, y + 34);
+
+            y += 42;
+        });
+
+        doc.save(`Ritten_Historie_${startVal}_tot_${eindVal}.pdf`);
     }
 
     function openBewerkModalDoorIndex(rowIndex) {
