@@ -39,7 +39,7 @@
         .rit-item { background: #fff; border: 1px solid #ddd; border-left: 5px solid #007bff; padding: 12px; margin-bottom: 10px; border-radius: 6px; }
         .rit-item.vandaag { border-left-color: #28a745; background: #f4faf5; }
         .rit-item.historie { border-left-color: #6c757d; background: #f8f9fa; opacity: 0.9; }
-        .rit-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 8px; font-size: 16px; }
+        .rit-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 8px; font-size: 16px; color: #007bff; }
         .rit-details { font-size: 14px; color: #444; margin-bottom: 10px; line-height: 1.5; }
         .rit-actions { display: flex; gap: 6px; flex-wrap: wrap; }
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); overflow: auto; }
@@ -385,7 +385,7 @@
                 html += `
                     <div class="${klasse}">
                         <div class="rit-header">
-                            <span>🏢 ${rit.bedrijf || 'Geen bedrijf'}</span>
+                            <span>🏢 Bedrijf: ${rit.bedrijf || 'Geen bedrijf opgegeven'}</span>
                             <span>📅 ${netDatum}</span>
                         </div>
                         <div class="rit-details">
@@ -429,8 +429,8 @@
                 html += `
                     <div class="rit-item historie">
                         <div class="rit-header">
-                            <span>🏢 ${rit.bedrijf || 'Geen bedrijf'}</span>
-                            <span>📅 ${netDatum} (Voltooid)</span>
+                            <span>🏢 Bedrijf: ${rit.bedrijf || 'Geen bedrijf opgegeven'}</span>
+                            <span>📅 ${netDatum}</span>
                         </div>
                         <div class="rit-details">
                             <b>Start:</b> ${rit.startDatumTijd || '-'} | ${rit.haalAdres || '-'}<br>
@@ -450,7 +450,6 @@
         }
     }
 
-    // PDF GENERATOR FUNCTIE
     function genereerPDF() {
         const startVal = document.getElementById('pdfStartDatum').value;
         const eindVal = document.getElementById('pdfEindDatum').value;
@@ -465,7 +464,6 @@
         const endDate = new Date(eindVal);
         endDate.setHours(23,59,59,999);
 
-        // Filter voltooide ritten binnen de periode
         const gefilterd = voltooideCache.filter(rit => {
             if (!rit.afspraakDatumTijd) return false;
             const ritDatum = new Date(rit.afspraakDatumTijd);
@@ -498,7 +496,7 @@
 
             doc.setFont("helvetica", "bold");
             doc.setFontSize(12);
-            doc.text(`${index + 1}. Bedrijf: ${rit.bedrijf || 'Onbekend'}`, 14, y);
+            doc.text(`${index + 1}. Bedrijf: ${rit.bedrijf || 'Geen bedrijf'}`, 14, y);
             
             doc.setFont("helvetica", "normal");
             doc.setFontSize(10);
