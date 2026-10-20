@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ritten Planner</title>
+    <title>Ritten & Afspraken Planner</title>
     <style>
         body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; padding: 15px; }
         .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
-        .tab { flex: 1; padding: 12px; text-align: center; cursor: pointer; font-weight: bold; color: #666; background: #f8f9fa; border: 1px solid #ddd; border-bottom: none; }
+        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; cursor: pointer; }
+        .tab { flex: 1; padding: 12px; text-align: center; font-weight: bold; color: #666; background: #f8f9fa; border: 1px solid #ddd; border-bottom: none; }
         .tab.active { background: white; color: #007bff; border-top: 3px solid #007bff; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
@@ -46,11 +46,11 @@
 
 <div class="container">
     <div class="tabs">
-        <div class="tab active" onclick="wisselTab('formTab', this)">Nieuwe Rit</div>
-        <div class="tab" onclick="wisselTab('overzichtTab', this); laadOverzicht();">Overzicht Ritten</div>
+        <div id="tabForm" class="tab active" onclick="wisselTab('formTab', this)">Nieuwe Rit</div>
+        <div id="tabOverzicht" class="tab" onclick="wisselTab('overzichtTab', this); laadOverzicht();">Overzicht Ritten</div>
     </div>
 
-    <!-- TAB 1: FORMULIER NIEUWE RIT -->
+    <!-- TAB 1: FORMULIER -->
     <div id="formTab" class="tab-content active">
         <h2>Nieuwe Rit Inplannen</h2>
 
@@ -117,14 +117,14 @@
         <div id="status"></div>
     </div>
 
-    <!-- TAB 2: OVERZICHT RITTEN -->
+    <!-- TAB 2: OVERZICHT -->
     <div id="overzichtTab" class="tab-content">
         <h2>Ritten Overzicht</h2>
         <div id="rittenLijst">Gegevens ophalen...</div>
     </div>
 </div>
 
-<!-- BEWERK MODAL (POP-UP MET KNOPPEN) -->
+<!-- BEWERK MODAL (POP-UP MET START, TUSSENSTOP EN STOP KNOPPEN) -->
 <div id="bewerkModal" class="modal">
     <div class="modal-content">
         <span class="close-btn" onclick="sluitModal()">&times;</span>
@@ -136,27 +136,24 @@
             <input type="text" id="editBedrijf">
         </div>
 
-        <!-- Start Sectie in Pop-up -->
         <div class="card card-start">
             <label>Start & Haal Adres:</label>
             <input type="text" id="editStartDatumTijd" placeholder="Starttijd" readonly>
-            <input type="text" id="editHaalAdres" placeholder="Haal Adres (GPS)" style="margin-top: 5px;">
+            <input type="text" id="editHaalAdres" placeholder="Haal Adres" style="margin-top: 5px;">
             <button type="button" class="btn-start" onclick="actieEditStart()">▶ START TIJD & ADRES PAKKEN</button>
         </div>
 
-        <!-- Extra / Tussenstop Sectie in Pop-up -->
         <div class="card card-extra">
             <label>Tussenstop / Extra Adres:</label>
             <input type="text" id="editExtraDatumTijd" placeholder="Tussenstoptijd" readonly>
-            <input type="text" id="editExtraAdres" placeholder="Extra Adres (GPS)" style="margin-top: 5px;">
+            <input type="text" id="editExtraAdres" placeholder="Extra Adres" style="margin-top: 5px;">
             <button type="button" class="btn-extra" onclick="actieEditExtra()">📍 TUSSENSTOP TIJD & ADRES PAKKEN</button>
         </div>
 
-        <!-- Stop Sectie in Pop-up -->
         <div class="card card-stop">
             <label>Stop & Breng Adres:</label>
             <input type="text" id="editStopDatumTijd" placeholder="Stoptijd" readonly>
-            <input type="text" id="editBrengAdres" placeholder="Breng Adres (GPS)" style="margin-top: 5px;">
+            <input type="text" id="editBrengAdres" placeholder="Breng Adres" style="margin-top: 5px;">
             <button type="button" class="btn-stop" onclick="actieEditStop()">⏹ STOP TIJD & ADRES PAKKEN</button>
         </div>
 
@@ -232,7 +229,6 @@
         } catch (e) { return isoStr; }
     }
 
-    // Acties Hoofdscherm
     async function actieStart() {
         document.getElementById('startDatumTijd').value = getNuFormatted();
         const loc = await haalGPSAdresOp();
@@ -268,7 +264,6 @@
         document.getElementById(`extraAdres_${id}`).value = loc.adres;
     }
 
-    // Acties Binnen Pop-up Modal
     async function actieEditStart() {
         document.getElementById('editStartDatumTijd').value = getNuFormatted();
         const loc = await haalGPSAdresOp();
@@ -315,4 +310,119 @@
             extraAdressen: extraLijst.join(' | '),
             stopDatumTijd: document.getElementById('stopDatumTijd').value,
             brengAdres: document.getElementById('brengAdres').value,
-            herhaling: document.getElementById('her
+            herhaling: document.getElementById('herhaling').value,
+            eindDatumHerhaling: document.getElementById('eindDatumHerhaling').value,
+            opmerkingen: document.getElementById('opmerkingen').value
+        };
+
+        try {
+            await verstuurDataForm(payload);
+            statusDiv.innerText = "✅ Succesvol opgeslagen!";
+        } catch (e) {
+            statusDiv.innerText = "❌ Fout: " + e.message;
+        }
+    }
+
+    async function laadOverzicht() {
+        const lijstDiv = document.getElementById('rittenLijst');
+        lijstDiv.innerText = "Laden...";
+
+        try {
+            const res = await fetch(webhookUrl);
+            globaleRittenData = await res.json();
+
+            if (!globaleRittenData || globaleRittenData.length === 0) {
+                lijstDiv.innerText = "Geen ritten gevonden.";
+                return;
+            }
+
+            const vandaagStr = new Date().toISOString().split('T')[0];
+            globaleRittenData.sort((a, b) => {
+                let datumA = a.afspraakDatumTijd ? a.afspraakDatumTijd.split('T')[0] : '9999-99-99';
+                let datumB = b.afspraakDatumTijd ? b.afspraakDatumTijd.split('T')[0] : '9999-99-99';
+                return datumA.localeCompare(datumB);
+            });
+
+            let html = '';
+            globaleRittenData.forEach((rit, index) => {
+                let isVandaag = rit.afspraakDatumTijd && rit.afspraakDatumTijd.startsWith(vandaagStr);
+                let klasse = isVandaag ? 'rit-item vandaag' : 'rit-item';
+                let netDatum = meesFormattedDatum(rit.afspraakDatumTijd);
+
+                html += `
+                    <div class="${klasse}">
+                        <div class="rit-header">
+                            <span>🏢 ${rit.bedrijf || 'Geen bedrijf'}</span>
+                            <span>📅 ${netDatum}</span>
+                        </div>
+                        <div class="rit-details">
+                            <b>Start:</b> ${rit.haalAdres || '-'}<br>
+                            <b>Extra:</b> ${rit.extraAdressen || '-'}<br>
+                            <b>Stop:</b> ${rit.brengAdres || '-'}<br>
+                            <b>Notitie:</b> ${rit.opmerkingen || '-'}
+                        </div>
+                        <div class="rit-actions">
+                            <button class="btn-edit" onclick="openBewerkModal(${index})">Bewerken</button>
+                            <button class="btn-del" onclick="verwijderRit(${rit.rowIndex})">Delete</button>
+                        </div>
+                    </div>
+                `;
+            });
+            lijstDiv.innerHTML = html;
+        } catch (e) {
+            lijstDiv.innerText = "Fout bij laden overzicht: " + e.message;
+        }
+    }
+
+    function openBewerkModal(index) {
+        const rit = globaleRittenData[index];
+        document.getElementById('editRowIndex').value = rit.rowIndex;
+        document.getElementById('editBedrijf').value = rit.bedrijf || '';
+        document.getElementById('editStartDatumTijd').value = rit.startDatumTijd || '';
+        document.getElementById('editHaalAdres').value = rit.haalAdres || '';
+        document.getElementById('editExtraAdres').value = rit.extraAdressen || '';
+        document.getElementById('editStopDatumTijd').value = rit.stopDatumTijd || '';
+        document.getElementById('editBrengAdres').value = rit.brengAdres || '';
+        document.getElementById('editOpmerkingen').value = rit.opmerkingen || '';
+        document.getElementById('bewerkModal').style.display = 'block';
+    }
+
+    function sluitModal() {
+        document.getElementById('bewerkModal').style.display = 'none';
+    }
+
+    async function opslaanBewerking() {
+        let extraTekst = document.getElementById('editExtraAdres').value;
+        const extraTijd = document.getElementById('editExtraDatumTijd').value;
+        if (extraTijd && !extraTekst.includes(extraTijd)) {
+            extraTekst = `${extraTijd} - ${extraTekst}`;
+        }
+
+        const payload = {
+            actie: 'UPDATE',
+            rowIndex: document.getElementById('editRowIndex').value,
+            bedrijf: document.getElementById('editBedrijf').value,
+            startDatumTijd: document.getElementById('editStartDatumTijd').value,
+            haalAdres: document.getElementById('editHaalAdres').value,
+            extraAdressen: extraTekst,
+            stopDatumTijd: document.getElementById('editStopDatumTijd').value,
+            brengAdres: document.getElementById('editBrengAdres').value,
+            opmerkingen: document.getElementById('editOpmerkingen').value
+        };
+
+        sluitModal();
+        document.getElementById('rittenLijst').innerText = "Bijwerken...";
+        await verstuurDataForm(payload);
+        setTimeout(() => { laadOverzicht(); }, 1000);
+    }
+
+    async function verwijderRit(rowIndex) {
+        if (!confirm("Weet je zeker dat je deze rit wilt verwijderen?")) return;
+        document.getElementById('rittenLijst').innerText = "Verwijderen...";
+        await verstuurDataForm({ actie: 'DELETE', rowIndex: rowIndex });
+        setTimeout(() => { laadOverzicht(); }, 1000);
+    }
+</script>
+
+</body>
+</html>
