@@ -3,31 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Locatie & Tijd Tracker</title>
+    <title>Ritten & Tijd Registratie</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             text-align: center;
-            margin-top: 50px;
+            margin-top: 30px;
             background-color: #f4f4f9;
         }
+        .btn-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+            margin-top: 20px;
+        }
         button {
-            background-color: #4CAF50;
+            width: 80%;
+            max-width: 300px;
+            padding: 18px;
+            font-size: 20px;
+            font-weight: bold;
             color: white;
             border: none;
-            padding: 20px 40px;
-            font-size: 24px;
-            border-radius: 10px;
+            border-radius: 12px;
             cursor: pointer;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.15);
         }
-        button:active {
-            background-color: #45a049;
-            transform: scale(0.98);
-        }
+        .btn-start { background-color: #28a745; }
+        .btn-wacht { background-color: #ffc107; color: #333; }
+        .btn-stop  { background-color: #dc3545; }
+        button:active { transform: scale(0.97); }
+        
         #status {
-            margin-top: 30px;
-            font-size: 18px;
+            margin-top: 25px;
+            font-size: 16px;
             color: #333;
             white-space: pre-line;
             padding: 0 20px;
@@ -36,71 +46,115 @@
 </head>
 <body>
 
-    <h1>Locatie & Tijd Vastleggen</h1>
-    <button onclick="captureData()">START</button>
-    <div id="status">Druk op de knop om te starten.</div>
+    <h2>Ritten Registratie App</h2>
+
+    <div class="btn-container">
+        <button class="btn-start" onclick="registreerActie('START')">▶ START RIT</button>
+        <button class="btn-wacht" onclick="registreerActie('WACHT')">⏸ WACHT / PAUZE</button>
+        <button class="btn-stop"  onclick="registreerActie('STOP')">⏹ STOP RIT</button>
+    </div>
+
+    <div id="status">Druk op START om je rit te beginnen.</div>
 
     <script>
-        async function captureData() {
-            const statusDiv = document.getElementById('status');
-            statusDiv.innerText = "Bezig met ophalen van tijd en locatie...";
+        // Vervang door jouw eigen Google Apps Script URL
+        const webhookUrl = 'JOUW_GOOGLE_APPS_SCRIPT_URL';
 
-            // 1. Tijd en datum vastleggen
+        let huidigeRit = {
+            startDatum: '',
+            startTijd: '',
+            startAdres: '',
+            wachtMomenten: []
+        };
+
+        // Functie om de adresgegevens via GPS op te vragen
+        function haalAdresOp() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject("Geolocatie wordt niet ondersteund.");
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(async (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lon = pos.coords.longitude;
+                    try {
+                        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                        const data = await res.json();
+                        resolve({
+                            adres: data.display_name || "Adres onbekend",
+                            lat: lat,
+                            lon: lon
+                        });
+                    } catch (e) {
+                        resolve({ adres: "Kon adres niet ophalen", lat: lat, lon: lon });
+                    }
+                }, (err) => reject("Locatietoestemming geweigerd of time-out."), 
+                { enableHighAccuracy: true, timeout: 10000 });
+            });
+        }
+
+        async function registreerActie(type) {
+            const statusDiv = document.getElementById('status');
             const now = new Date();
             const datum = now.toLocaleDateString('nl-NL');
             const tijd = now.toLocaleTimeString('nl-NL');
 
-            // 2. Controleren of locatie ondersteund wordt
-            if (!navigator.geolocation) {
-                statusDiv.innerText = "Geolocatie wordt niet ondersteund door jouw browser.";
-                return;
-            }
+            statusDiv.innerText = `${type} gekozen... Locatie/adres ophalen...`;
 
-            // 3. GPS-coördinaten ophalen
-            navigator.geolocation.getCurrentPosition(async (position) => {
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
+            try {
+                const locatieData = await haalAdresOp();
 
-                statusDiv.innerText = "GPS gevonden! Adres opzoeken...";
+                if (type === 'START') {
+                    huidigeRit.startDatum = datum;
+                    huidigeRit.startTijd = tijd;
+                    huidigeRit.startAdres = locatieData.adres;
 
-                try {
-                    // 4. Coördinaten omzetten naar een echt adres via OpenStreetMap (Gratis Nominatim API)
-                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-                    const data = await response.json();
-                    const adres = data.display_name || "Adres niet gevonden";
-
-                    const payload = {
+                    statusDiv.innerText = `Rit gestart!\n\nStarttijd: ${tijd}\nStartadres: ${locatieData.adres}`;
+                    
+                    // Optioneel: stuur de start direct naar Google Script
+                    verstuurNaarGoogleScript({
+                        actie: 'START',
                         datum: datum,
                         tijd: tijd,
-                        latitude: lat,
-                        longitude: lon,
-                        adres: adres
-                    };
-
-                    statusDiv.innerText = "Gegevens verzenden naar Google Script...";
-
-                    // 5. Versturen naar jouw Google Apps Script Web App URL
-                    // Vervang JOUW_GOOGLE_APPS_SCRIPT_URL hieronder door jouw echte deployed web app URL
-                    const webhookUrl = 'https://script.google.com/macros/s/AKfycby0Gb9HG6IQCcW2BzWoYYPrBulQmHkmwnJdWmX8isSwNjC0zrCHU9Gz9xkM3K7ckJMr/exec';
-
-                    await fetch(webhookUrl, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
+                        adres: locatieData.adres
                     });
 
-                    statusDiv.innerText = `Succesvol opgeslagen!\n\nDatum: ${datum}\nTijd: ${tijd}\nAdres: ${adres}`;
+                } else if (type === 'WACHT') {
+                    statusDiv.innerText = `Wachtmoment vastgelegd!\n\nTijd: ${tijd}\nLocatie: ${locatieData.adres}`;
+                    
+                    verstuurNaarGoogleScript({
+                        actie: 'WACHT',
+                        datum: datum,
+                        tijd: tijd,
+                        adres: locatieData.adres
+                    });
 
-                } catch (error) {
-                    statusDiv.innerText = "Fout bij ophalen van het adres of verzenden: " + error.message;
+                } else if (type === 'STOP') {
+                    statusDiv.innerText = `Rit gestopt!\n\nEindtijd: ${tijd}\nEindadres: ${locatieData.adres}`;
+                    
+                    verstuurNaarGoogleScript({
+                        actie: 'STOP',
+                        startDatum: huidigeRit.startDatum,
+                        startTijd: huidigeRit.startTijd,
+                        startAdres: huidigeRit.startAdres,
+                        eindDatum: datum,
+                        eindTijd: tijd,
+                        eindAdres: locatieData.adres
+                    });
                 }
-            }, (error) => {
-                statusDiv.innerText = "Kon locatie niet ophalen. Controleer of locatietoestemming aan staat.\nFout: " + error.message;
-            }, {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
+            } catch (err) {
+                statusDiv.innerText = "Fout: " + err;
+            }
+        }
+
+        async function verstuurNaarGoogleScript(payload) {
+            if (webhookUrl === 'https://script.google.com/macros/s/AKfycby0Gb9HG6IQCcW2BzWoYYPrBulQmHkmwnJdWmX8isSwNjC0zrCHU9Gz9xkM3K7ckJMr/exec) return;
+            
+            await fetch(webhookUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             });
         }
     </script>
