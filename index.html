@@ -3,160 +3,170 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ritten & Tijd Registratie</title>
+    <title>Ritten & Afspraken Planner</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            text-align: center;
-            margin-top: 30px;
             background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
         }
-        .btn-container {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            align-items: center;
-            margin-top: 20px;
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
-        button {
-            width: 80%;
-            max-width: 300px;
-            padding: 18px;
-            font-size: 20px;
+        h2 { text-align: center; color: #333; }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
             font-weight: bold;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        textarea { resize: vertical; height: 80px; }
+        button {
+            width: 100%;
+            background-color: #28a745;
             color: white;
             border: none;
-            border-radius: 12px;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 8px;
             cursor: pointer;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+            margin-top: 10px;
         }
-        .btn-start { background-color: #28a745; }
-        .btn-wacht { background-color: #ffc107; color: #333; }
-        .btn-stop  { background-color: #dc3545; }
-        button:active { transform: scale(0.97); }
-        
+        button:active { background-color: #218838; }
         #status {
-            margin-top: 25px;
-            font-size: 16px;
+            margin-top: 20px;
+            text-align: center;
+            font-weight: bold;
             color: #333;
-            white-space: pre-line;
-            padding: 0 20px;
         }
+        .row {
+            display: flex;
+            gap: 10px;
+        }
+        .row .form-group { flex: 1; }
     </style>
 </head>
 <body>
 
-    <h2>Ritten Registratie App</h2>
-
-    <div class="btn-container">
-        <button class="btn-start" onclick="registreerActie('START')">▶ START RIT</button>
-        <button class="btn-wacht" onclick="registreerActie('WACHT')">⏸ WACHT / PAUZE</button>
-        <button class="btn-stop"  onclick="registreerActie('STOP')">⏹ STOP RIT</button>
+<div class="container">
+    <h2>Rit Inplannen</h2>
+    
+    <div class="form-group">
+        <label>Bedrijf:</label>
+        <input type="text" id="bedrijf" placeholder="Naam van het bedrijf">
     </div>
 
-    <div id="status">Druk op START om je rit te beginnen.</div>
+    <div class="form-group">
+        <label>Afspraak Datum & Tijd:</label>
+        <input type="datetime-local" id="afspraakDatumTijd">
+    </div>
 
-    <script>
-        // Vervang door jouw eigen Google Apps Script URL
-        const webhookUrl = 'JOUW_GOOGLE_APPS_SCRIPT_URL';
+    <div class="row">
+        <div class="form-group">
+            <label>Start Datumtijd:</label>
+            <input type="datetime-local" id="startDatumTijd">
+        </div>
+        <div class="form-group">
+            <label>Stop Datumtijd:</label>
+            <input type="datetime-local" id="stopDatumTijd">
+        </div>
+    </div>
 
-        let huidigeRit = {
-            startDatum: '',
-            startTijd: '',
-            startAdres: '',
-            wachtMomenten: []
+    <div class="form-group">
+        <label>Haal Adres:</label>
+        <input type="text" id="haalAdres" placeholder="Ophaladres">
+    </div>
+
+    <div class="form-group">
+        <label>Breng Adres:</label>
+        <input type="text" id="brengAdres" placeholder="Afleveradres">
+    </div>
+
+    <div class="form-group">
+        <label>Extra Adres:</label>
+        <input type="text" id="extraAdres" placeholder="Eventueel tussenstop / extra adres">
+    </div>
+
+    <div class="row">
+        <div class="form-group">
+            <label>Herhaling:</label>
+            <select id="herhaling">
+                <option value="Geen">Geen</option>
+                <option value="Dagelijkse">Dagelijks</option>
+                <option value="Om de dag">Om de dag</option>
+                <option value="Ma-Wo-Vr">Ma - Wo - Vr</option>
+                <option value="Di-Do-Za">Di - Do - Za</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Einddatum Herhaling:</label>
+            <input type="date" id="eindDatumHerhaling">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>Opmerkingen:</label>
+        <textarea id="opmerkingen" placeholder="Eventuele bijzonderheden..."></textarea>
+    </div>
+
+    <button onclick="verstuurPlanning()">OPSLAAN / INPLANNEN</button>
+    <div id="status"></div>
+</div>
+
+<script>
+    // Vervang dit door jouw Google Apps Script Web App URL
+    const webhookUrl = 'JOUW_GOOGLE_APPS_SCRIPT_URL';
+
+    async function verstuurPlanning() {
+        const statusDiv = document.getElementById('status');
+        statusDiv.innerText = "Gegevens verzenden...";
+
+        const payload = {
+            bedrijf: document.getElementById('bedrijf').value,
+            afspraakDatumTijd: document.getElementById('afspraakDatumTijd').value,
+            startDatumTijd: document.getElementById('startDatumTijd').value,
+            stopDatumTijd: document.getElementById('stopDatumTijd').value,
+            haalAdres: document.getElementById('haalAdres').value,
+            brengAdres: document.getElementById('brengAdres').value,
+            extraAdres: document.getElementById('extraAdres').value,
+            herhaling: document.getElementById('herhaling').value,
+            eindDatumHerhaling: document.getElementById('eindDatumHerhaling').value,
+            opmerkingen: document.getElementById('opmerkingen').value
         };
 
-        // Functie om de adresgegevens via GPS op te vragen
-        function haalAdresOp() {
-            return new Promise((resolve, reject) => {
-                if (!navigator.geolocation) {
-                    reject("Geolocatie wordt niet ondersteund.");
-                    return;
-                }
-                navigator.geolocation.getCurrentPosition(async (pos) => {
-                    const lat = pos.coords.latitude;
-                    const lon = pos.coords.longitude;
-                    try {
-                        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
-                        const data = await res.json();
-                        resolve({
-                            adres: data.display_name || "Adres onbekend",
-                            lat: lat,
-                            lon: lon
-                        });
-                    } catch (e) {
-                        resolve({ adres: "Kon adres niet ophalen", lat: lat, lon: lon });
-                    }
-                }, (err) => reject("Locatietoestemming geweigerd of time-out."), 
-                { enableHighAccuracy: true, timeout: 10000 });
-            });
-        }
-
-        async function registreerActie(type) {
-            const statusDiv = document.getElementById('status');
-            const now = new Date();
-            const datum = now.toLocaleDateString('nl-NL');
-            const tijd = now.toLocaleTimeString('nl-NL');
-
-            statusDiv.innerText = `${type} gekozen... Locatie/adres ophalen...`;
-
-            try {
-                const locatieData = await haalAdresOp();
-
-                if (type === 'START') {
-                    huidigeRit.startDatum = datum;
-                    huidigeRit.startTijd = tijd;
-                    huidigeRit.startAdres = locatieData.adres;
-
-                    statusDiv.innerText = `Rit gestart!\n\nStarttijd: ${tijd}\nStartadres: ${locatieData.adres}`;
-                    
-                    // Optioneel: stuur de start direct naar Google Script
-                    verstuurNaarGoogleScript({
-                        actie: 'START',
-                        datum: datum,
-                        tijd: tijd,
-                        adres: locatieData.adres
-                    });
-
-                } else if (type === 'WACHT') {
-                    statusDiv.innerText = `Wachtmoment vastgelegd!\n\nTijd: ${tijd}\nLocatie: ${locatieData.adres}`;
-                    
-                    verstuurNaarGoogleScript({
-                        actie: 'WACHT',
-                        datum: datum,
-                        tijd: tijd,
-                        adres: locatieData.adres
-                    });
-
-                } else if (type === 'STOP') {
-                    statusDiv.innerText = `Rit gestopt!\n\nEindtijd: ${tijd}\nEindadres: ${locatieData.adres}`;
-                    
-                    verstuurNaarGoogleScript({
-                        actie: 'STOP',
-                        startDatum: huidigeRit.startDatum,
-                        startTijd: huidigeRit.startTijd,
-                        startAdres: huidigeRit.startAdres,
-                        eindDatum: datum,
-                        eindTijd: tijd,
-                        eindAdres: locatieData.adres
-                    });
-                }
-            } catch (err) {
-                statusDiv.innerText = "Fout: " + err;
-            }
-        }
-
-        async function verstuurNaarGoogleScript(payload) {
-            if (webhookUrl === 'https://script.google.com/macros/s/AKfycby0Gb9HG6IQCcW2BzWoYYPrBulQmHkmwnJdWmX8isSwNjC0zrCHU9Gz9xkM3K7ckJMr/exec) return;
-            
+        try {
             await fetch(webhookUrl, {
                 method: 'POST',
                 mode: 'no-cors',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+
+            statusDiv.innerText = "Succesvol ingepland!";
+            // Optioneel formulier legen na verzenden
+        } catch (error) {
+            statusDiv.innerText = "Fout bij verzenden: " + error.message;
         }
-    </script>
+    }
+</script>
+
 </body>
 </html>
