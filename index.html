@@ -94,7 +94,7 @@
         <input type="text" id="extraDatumTijd" placeholder="Tussenstoptijd" readonly>
         <input type="text" id="extraAdres" placeholder="Extra Adres (GPS)" style="margin-top: 5px;">
         <div class="btn-group">
-            <button class="btn-extra" onclick="actieExtraAdres()">📍 EXTRA ADRES BAPALEN</button>
+            <button class="btn-extra" onclick="actieExtraAdres()">📍 EXTRA ADRES BEPALEN</button>
         </div>
     </div>
 
@@ -135,8 +135,8 @@
 </div>
 
 <script>
-    // Vul hier jouw Google Apps Script Web App URL in
-    const webhookUrl = 'JOUW_GOOGLE_APPS_SCRIPT_URL';
+    // Jouw ingevoerde Google Apps Script Web App URL
+    const webhookUrl = 'https://script.google.com/macros/s/AKfycby0Gb9HG6IQCcW2BzWoYYPrBulQmHkmwnJdWmX8isSwNjC0zrCHU9Gz9xkM3K7ckJMr/exec';
 
     // 1. Bedrijf toevoegen aan de dropdown
     function voegBedrijfToe() {
@@ -226,8 +226,6 @@
 
     // Data verzenden naar Google Apps Script
     async function verstuurData(actieType) {
-        if (webhookUrl === 'JOUW_GOOGLE_APPS_SCRIPT_URL') return;
-
         const payload = {
             actie: actieType,
             bedrijf: document.getElementById('bedrijfSelect').value,
