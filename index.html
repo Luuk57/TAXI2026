@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Locatie & Tijd Tracker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+            background-color: #f4f4f9;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            font-size: 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        button:active {
+            background-color: #45a049;
+            transform: scale(0.98);
+        }
+        #status {
+            margin-top: 30px;
+            font-size: 18px;
+            color: #333;
+            white-space: pre-line;
+            padding: 0 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Locatie & Tijd Vastleggen</h1>
+    <button onclick="captureData()">START</button>
+    <div id="status">Druk op de knop om te starten.</div>
+
+    <script>
+        async function captureData() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerText = "Bezig met ophalen van tijd en locatie...";
+
+            // 1. Tijd en datum vastleggen
+            const now = new Date();
+            const datum = now.toLocaleDateString('nl-NL');
+            const tijd = now.toLocaleTimeString('nl-NL');
+
+            // 2. Controleren of locatie ondersteund wordt
+            if (!navigator.geolocation) {
+                statusDiv.innerText = "Geolocatie wordt niet ondersteund door jouw browser.";
+                return;
+            }
+
+            // 3. GPS-coördinaten ophalen
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+
+                statusDiv.innerText = "GPS gevonden! Adres opzoeken...";
+
+                try {
+                    // 4. Coördinaten omzetten naar een echt adres via OpenStreetMap (Gratis Nominatim API)
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                    const data = await response.json();
+                    const adres = data.display_name || "Adres niet gevonden";
+
+                    const payload = {
+                        datum: datum,
+                        tijd: tijd,
+                        latitude: lat,
+                        longitude: lon,
+                        adres: adres
+                    };
+
+                    statusDiv.innerText = "Gegevens verzenden naar Google Script...";
+
+                    // 5. Versturen naar jouw Google Apps Script Web App URL
+                    // Vervang JOUW_GOOGLE_APPS_SCRIPT_URL hieronder door jouw echte deployed web app URL
+                    const webhookUrl = 'JOUW_GOOGLE_APPS_SCRIPT_URL';
+
+                    await fetch(webhookUrl, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    statusDiv.innerText = `Succesvol opgeslagen!\n\nDatum: ${datum}\nTijd: ${tijd}\nAdres: ${adres}`;
+
+                } catch (error) {
+                    statusDiv.innerText = "Fout bij ophalen van het adres of verzenden: " + error.message;
+                }
+            }, (error) => {
+                statusDiv.innerText = "Kon locatie niet ophalen. Controleer of locatietoestemming aan staat.\nFout: " + error.message;
+            }, {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            });
+        }
+    </script>
+</body>
+</html>
