@@ -8,7 +8,7 @@
         body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; padding: 15px; }
         .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; cursor: pointer; }
-        .tab { flex: 1; padding: 12px; text-align: center; font-weight: bold; color: #666; background: #f8f9fa; border: 1px solid #ddd; border-bottom: none; }
+        .tab { flex: 1; padding: 10px; text-align: center; font-weight: bold; font-size: 14px; color: #666; background: #f8f9fa; border: 1px solid #ddd; border-bottom: none; }
         .tab.active { background: white; color: #007bff; border-top: 3px solid #007bff; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
@@ -27,16 +27,18 @@
         .btn-extra { background-color: #17a2b8; }
         .btn-add { background-color: #007bff; width: auto; padding: 10px 15px; }
         .btn-save { background-color: #6f42c1; font-size: 18px; padding: 15px; margin-top: 15px; }
-        .btn-edit { background-color: #ffc107; color: #333; padding: 6px 12px; font-size: 13px; width: auto; }
-        .btn-del { background-color: #dc3545; padding: 6px 12px; font-size: 13px; width: auto; }
+        .btn-edit { background-color: #ffc107; color: #333; padding: 6px 10px; font-size: 13px; width: auto; }
+        .btn-del { background-color: #dc3545; padding: 6px 10px; font-size: 13px; width: auto; }
+        .btn-done { background-color: #28a745; color: white; padding: 6px 10px; font-size: 13px; width: auto; }
         .row { display: flex; gap: 10px; }
         .row .form-group { flex: 1; }
         #status { margin-top: 15px; text-align: center; font-weight: bold; color: #333; white-space: pre-line; }
         .rit-item { background: #fff; border: 1px solid #ddd; border-left: 5px solid #007bff; padding: 12px; margin-bottom: 10px; border-radius: 6px; }
         .rit-item.vandaag { border-left-color: #28a745; background: #f4faf5; }
+        .rit-item.historie { border-left-color: #6c757d; background: #f8f9fa; opacity: 0.85; }
         .rit-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 8px; font-size: 16px; }
         .rit-details { font-size: 14px; color: #444; margin-bottom: 10px; line-height: 1.5; }
-        .rit-actions { display: flex; gap: 8px; }
+        .rit-actions { display: flex; gap: 6px; flex-wrap: wrap; }
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); overflow: auto; }
         .modal-content { background-color: white; margin: 5% auto; padding: 20px; border-radius: 12px; max-width: 500px; position: relative; }
         .close-btn { position: absolute; right: 15px; top: 10px; font-size: 24px; cursor: pointer; color: #aaa; }
@@ -47,7 +49,8 @@
 <div class="container">
     <div class="tabs">
         <div id="tabForm" class="tab active" onclick="wisselTab('formTab', this)">Nieuwe Rit</div>
-        <div id="tabOverzicht" class="tab" onclick="wisselTab('overzichtTab', this); laadOverzicht();">Overzicht Ritten</div>
+        <div id="tabOverzicht" class="tab" onclick="wisselTab('overzichtTab', this); laadOverzicht();">Overzicht</div>
+        <div id="tabHistorie" class="tab" onclick="wisselTab('historieTab', this); laadHistorie();">Historie</div>
     </div>
 
     <!-- TAB 1: FORMULIER -->
@@ -119,12 +122,18 @@
 
     <!-- TAB 2: OVERZICHT -->
     <div id="overzichtTab" class="tab-content">
-        <h2>Ritten Overzicht</h2>
+        <h2>Actieve Ritten</h2>
         <div id="rittenLijst">Gegevens ophalen...</div>
+    </div>
+
+    <!-- TAB 3: HISTORIE -->
+    <div id="historieTab" class="tab-content">
+        <h2>Voltooide Ritten (Historie)</h2>
+        <div id="historieLijst">Historie ophalen...</div>
     </div>
 </div>
 
-<!-- BEWERK MODAL (POP-UP MET START, TUSSENSTOP EN STOP KNOPPEN) -->
+<!-- BEWERK MODAL -->
 <div id="bewerkModal" class="modal">
     <div class="modal-content">
         <span class="close-btn" onclick="sluitModal()">&times;</span>
@@ -303,6 +312,7 @@
         }
 
         const payload = {
+            status: 'Actief',
             bedrijf: document.getElementById('bedrijfSelect').value,
             afspraakDatumTijd: document.getElementById('afspraakDatumTijd').value,
             startDatumTijd: document.getElementById('startDatumTijd').value,
@@ -331,20 +341,23 @@
             const res = await fetch(webhookUrl);
             globaleRittenData = await res.json();
 
-            if (!globaleRittenData || globaleRittenData.length === 0) {
-                lijstDiv.innerText = "Geen ritten gevonden.";
+            // Filter alleen actieve ritten
+            const actieveRitten = globaleRittenData.filter(rit => rit.status !== 'Voltooid');
+
+            if (actieveRitten.length === 0) {
+                lijstDiv.innerText = "Geen actieve ritten gevonden.";
                 return;
             }
 
             const vandaagStr = new Date().toISOString().split('T')[0];
-            globaleRittenData.sort((a, b) => {
+            actieveRitten.sort((a, b) => {
                 let datumA = a.afspraakDatumTijd ? a.afspraakDatumTijd.split('T')[0] : '9999-99-99';
                 let datumB = b.afspraakDatumTijd ? b.afspraakDatumTijd.split('T')[0] : '9999-99-99';
                 return datumA.localeCompare(datumB);
             });
 
             let html = '';
-            globaleRittenData.forEach((rit, index) => {
+            actieveRitten.forEach((rit) => {
                 let isVandaag = rit.afspraakDatumTijd && rit.afspraakDatumTijd.startsWith(vandaagStr);
                 let klasse = isVandaag ? 'rit-item vandaag' : 'rit-item';
                 let netDatum = meesFormattedDatum(rit.afspraakDatumTijd);
@@ -362,7 +375,8 @@
                             <b>Notitie:</b> ${rit.opmerkingen || '-'}
                         </div>
                         <div class="rit-actions">
-                            <button class="btn-edit" onclick="openBewerkModal(${index})">Bewerken</button>
+                            <button class="btn-done" onclick="markeerAlsVoltooid(${rit.rowIndex})">🏁 Afronden</button>
+                            <button class="btn-edit" onclick="openBewerkModalDoorIndex(${rit.rowIndex})">Bewerken</button>
                             <button class="btn-del" onclick="verwijderRit(${rit.rowIndex})">Delete</button>
                         </div>
                     </div>
@@ -374,8 +388,53 @@
         }
     }
 
-    function openBewerkModal(index) {
-        const rit = globaleRittenData[index];
+    async function laadHistorie() {
+        const lijstDiv = document.getElementById('historieLijst');
+        lijstDiv.innerText = "Historie laden...";
+
+        try {
+            const res = await fetch(webhookUrl);
+            const alleRitten = await res.json();
+
+            // Filter alleen voltooide ritten
+            const voltooideRitten = alleRitten.filter(rit => rit.status === 'Voltooid');
+
+            if (voltooideRitten.length === 0) {
+                lijstDiv.innerText = "Geen voltooide ritten in de historie.";
+                return;
+            }
+
+            let html = '';
+            voltooideRitten.forEach((rit) => {
+                let netDatum = meesFormattedDatum(rit.afspraakDatumTijd);
+                html += `
+                    <div class="rit-item historie">
+                        <div class="rit-header">
+                            <span>🏢 ${rit.bedrijf || 'Geen bedrijf'}</span>
+                            <span>📅 ${netDatum} (Voltooid)</span>
+                        </div>
+                        <div class="rit-details">
+                            <b>Start:</b> ${rit.haalAdres || '-'}<br>
+                            <b>Extra:</b> ${rit.extraAdressen || '-'}<br>
+                            <b>Stop:</b> ${rit.brengAdres || '-'}<br>
+                            <b>Notitie:</b> ${rit.opmerkingen || '-'}
+                        </div>
+                        <div class="rit-actions">
+                            <button class="btn-del" onclick="verwijderRit(${rit.rowIndex})">Delete</button>
+                        </div>
+                    </div>
+                `;
+            });
+            lijstDiv.innerHTML = html;
+        } catch (e) {
+            lijstDiv.innerText = "Fout bij laden historie: " + e.message;
+        }
+    }
+
+    function openBewerkModalDoorIndex(rowIndex) {
+        const rit = globaleRittenData.find(r => r.rowIndex === rowIndex);
+        if (!rit) return;
+
         document.getElementById('editRowIndex').value = rit.rowIndex;
         document.getElementById('editBedrijf').value = rit.bedrijf || '';
         document.getElementById('editStartDatumTijd').value = rit.startDatumTijd || '';
@@ -416,11 +475,23 @@
         setTimeout(() => { laadOverzicht(); }, 1000);
     }
 
+    async function markeerAlsVoltooid(rowIndex) {
+        const payload = {
+            actie: 'STATUS',
+            rowIndex: rowIndex,
+            status: 'Voltooid'
+        };
+        await verstuurDataForm(payload);
+        laadOverzicht();
+    }
+
     async function verwijderRit(rowIndex) {
         if (!confirm("Weet je zeker dat je deze rit wilt verwijderen?")) return;
-        document.getElementById('rittenLijst').innerText = "Verwijderen...";
         await verstuurDataForm({ actie: 'DELETE', rowIndex: rowIndex });
-        setTimeout(() => { laadOverzicht(); }, 1000);
+        laadOverzicht();
+        if(document.getElementById('historieTab').classList.contains('active')) {
+            laadHistorie();
+        }
     }
 </script>
 
