@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Slimme Ritten & Afspraken Planner</title>
+    <title>Ritten & Afspraken Planner</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -32,9 +32,13 @@
         }
         textarea { resize: vertical; height: 60px; }
         
-        .btn-group { display: flex; gap: 8px; margin-top: 5px; }
+        .card { padding: 12px; border-radius: 8px; margin-bottom: 12px; }
+        .card-start { background: #eef9f1; border: 1px solid #c3e6cb; }
+        .card-extra { background: #e8f7f9; border: 1px solid #b8daff; }
+        .card-stop { background: #fde8e8; border: 1px solid #f5c6cb; }
+
         button {
-            flex: 1;
+            width: 100%;
             padding: 12px;
             font-size: 15px;
             font-weight: bold;
@@ -42,11 +46,13 @@
             border: none;
             border-radius: 6px;
             cursor: pointer;
+            margin-top: 5px;
         }
         .btn-start { background-color: #28a745; }
         .btn-stop { background-color: #dc3545; }
         .btn-extra { background-color: #17a2b8; }
         .btn-add { background-color: #007bff; width: auto; padding: 10px 15px; }
+        .btn-save { background-color: #6f42c1; font-size: 18px; padding: 15px; margin-top: 15px; }
         button:active { opacity: 0.85; }
 
         .row { display: flex; gap: 10px; }
@@ -72,40 +78,33 @@
         </div>
     </div>
 
-    <!-- Afspraak Datum & Tijd (Vooraf in te plannen) -->
+    <!-- Afspraak Datum & Tijd (Gepland) -->
     <div class="form-group">
         <label>Afspraak Datum & Tijd (Gepland):</label>
         <input type="datetime-local" id="afspraakDatumTijd">
     </div>
 
-    <!-- Start / Haal Adres Sectie -->
-    <div class="form-group" style="background: #eef9f1; padding: 10px; border-radius: 8px;">
+    <!-- Start / Haal Adres -->
+    <div class="card card-start">
         <label>Start & Haal Adres:</label>
         <input type="text" id="startDatumTijd" placeholder="Starttijd" readonly>
         <input type="text" id="haalAdres" placeholder="Haal Adres (GPS)" style="margin-top: 5px;">
-        <div class="btn-group">
-            <button class="btn-start" onclick="actieStart()">▶ START & OPSLAAN</button>
-        </div>
+        <button type="button" class="btn-start" onclick="actieStart()">▶ START LOCATIE & TIJD PAKKEN</button>
     </div>
 
-    <!-- Extra Adres Sectie -->
-    <div class="form-group" style="background: #e8f7f9; padding: 10px; border-radius: 8px;">
-        <label>Extra Adres / Tussenstop:</label>
-        <input type="text" id="extraDatumTijd" placeholder="Tussenstoptijd" readonly>
-        <input type="text" id="extraAdres" placeholder="Extra Adres (GPS)" style="margin-top: 5px;">
-        <div class="btn-group">
-            <button class="btn-extra" onclick="actieExtraAdres()">📍 EXTRA ADRES BEPALEN</button>
-        </div>
-    </div>
+    <!-- Dynamische Extra Adressen Container -->
+    <div id="extraAdressenContainer"></div>
+    
+    <button type="button" class="btn-extra" onclick="voegExtraAdresToe()" style="margin-bottom: 15px;">
+        ➕ Extra adres / tussenstop toevoegen
+    </button>
 
-    <!-- Stop / Breng Adres Sectie -->
-    <div class="form-group" style="background: #fde8e8; padding: 10px; border-radius: 8px;">
+    <!-- Stop / Breng Adres -->
+    <div class="card card-stop">
         <label>Stop & Breng Adres:</label>
         <input type="text" id="stopDatumTijd" placeholder="Stoptijd" readonly>
         <input type="text" id="brengAdres" placeholder="Breng Adres (GPS)" style="margin-top: 5px;">
-        <div class="btn-group">
-            <button class="btn-stop" onclick="actieStop()">⏹ STOP & UPDATE</button>
-        </div>
+        <button type="button" class="btn-stop" onclick="actieStop()">⏹ STOP LOCATIE & TIJD PAKKEN</button>
     </div>
 
     <!-- Herhaling & Opmerkingen -->
@@ -131,14 +130,16 @@
         <textarea id="opmerkingen" placeholder="Eventuele bijzonderheden..."></textarea>
     </div>
 
+    <!-- De OPSLAAN KNOP -->
+    <button type="button" class="btn-save" onclick="opslaanAlles()">💾 OPSLAAN IN GOOGLE SHEETS</button>
+
     <div id="status"></div>
 </div>
 
 <script>
-    // Jouw ingevoerde Google Apps Script Web App URL
     const webhookUrl = 'https://script.google.com/macros/s/AKfycby0Gb9HG6IQCcW2BzWoYYPrBulQmHkmwnJdWmX8isSwNjC0zrCHU9Gz9xkM3K7ckJMr/exec';
+    let extraAdresTeller = 0;
 
-    // 1. Bedrijf toevoegen aan de dropdown
     function voegBedrijfToe() {
         const nieuwBedrijf = prompt("Voer de naam van het nieuwe bedrijf in:");
         if (nieuwBedrijf && nieuwBedrijf.trim() !== "") {
@@ -151,7 +152,6 @@
         }
     }
 
-    // 2. GPS Locatie & Adres ophalen
     function haalGPSAdresOp() {
         return new Promise((resolve) => {
             if (!navigator.geolocation) {
@@ -172,68 +172,71 @@
         });
     }
 
-    // Datum + Tijd formaat maker
     function getNuFormatted() {
         const d = new Date();
         return d.toLocaleDateString('nl-NL') + ' ' + d.toLocaleTimeString('nl-NL');
     }
 
-    // ACTIE: START (Legt tijd/haaladres vast en slaat direct op)
     async function actieStart() {
-        const statusDiv = document.getElementById('status');
-        statusDiv.innerText = "Starttijd vastleggen en GPS-adres ophalen...";
-
-        const nuStr = getNuFormatted();
-        document.getElementById('startDatumTijd').value = nuStr;
-
+        document.getElementById('startDatumTijd').value = getNuFormatted();
         const loc = await haalGPSAdresOp();
         document.getElementById('haalAdres').value = loc.adres;
-
-        statusDiv.innerText = "Gegevens opslaan in Google Sheets...";
-        await verstuurData('START');
-        statusDiv.innerText = "▶ Rit gestart & opgeslagen!";
     }
 
-    // ACTIE: EXTRA ADRES (Legt tussenstoptijd en extra adres vast)
-    async function actieExtraAdres() {
-        const statusDiv = document.getElementById('status');
-        statusDiv.innerText = "Tussenstop tijd & adres ophalen...";
-
-        const nuStr = getNuFormatted();
-        document.getElementById('extraDatumTijd').value = nuStr;
-
-        const loc = await haalGPSAdresOp();
-        document.getElementById('extraAdres').value = loc.adres;
-
-        statusDiv.innerText = "📍 Extra adres & tijd vastgelegd!";
-    }
-
-    // ACTIE: STOP (Legt stoptijd/brengadres vast en verstuurt update/eindstatus)
     async function actieStop() {
-        const statusDiv = document.getElementById('status');
-        statusDiv.innerText = "Stoptijd vastleggen en GPS-adres ophalen...";
-
-        const nuStr = getNuFormatted();
-        document.getElementById('stopDatumTijd').value = nuStr;
-
+        document.getElementById('stopDatumTijd').value = getNuFormatted();
         const loc = await haalGPSAdresOp();
         document.getElementById('brengAdres').value = loc.adres;
-
-        statusDiv.innerText = "Eindgegevens opslaan in Google Sheets...";
-        await verstuurData('STOP');
-        statusDiv.innerText = "⏹ Rit beëindigd & bijgewerkt!";
     }
 
-    // Data verzenden naar Google Apps Script
-    async function verstuurData(actieType) {
+    // Functie voor het dynamisch toevoegen van meerdere extra adressen
+    async function voegExtraAdresToe() {
+        extraAdresTeller++;
+        const id = extraAdresTeller;
+        const container = document.getElementById('extraAdressenContainer');
+
+        const card = document.createElement('div');
+        card.className = 'card card-extra';
+        card.id = `extraCard_${id}`;
+        card.innerHTML = `
+            <label>Extra Adres #${id}:</label>
+            <input type="text" id="extraTijd_${id}" placeholder="Tussenstoptijd" readonly>
+            <input type="text" id="extraAdres_${id}" placeholder="Extra Adres (GPS)" style="margin-top: 5px;">
+            <button type="button" class="btn-extra" onclick="bepaalExtraGPS(${id})">📍 LOCATIE & TIJD PAKKEN</button>
+        `;
+        container.appendChild(card);
+
+        // Direct ook de locatie voor deze nieuw aangemaakte tussenstop bepalen
+        await bepaalExtraGPS(id);
+    }
+
+    async function bepaalExtraGPS(id) {
+        document.getElementById(`extraTijd_${id}`).value = getNuFormatted();
+        const loc = await haalGPSAdresOp();
+        document.getElementById(`extraAdres_${id}`).value = loc.adres;
+    }
+
+    // Hoofdfunctie voor handmatige opslag
+    async function opslaanAlles() {
+        const statusDiv = document.getElementById('status');
+        statusDiv.innerText = "Gegevens verzenden en herhalingen uitschrijven...";
+
+        // Verzamel alle extra adressen
+        let extraLijst = [];
+        for (let i = 1; i <= extraAdresTeller; i++) {
+            const t = document.getElementById(`extraTijd_${i}`)?.value || '';
+            const a = document.getElementById(`extraAdres_${i}`)?.value || '';
+            if (a || t) {
+                extraLijst.push(`${t} - ${a}`);
+            }
+        }
+
         const payload = {
-            actie: actieType,
             bedrijf: document.getElementById('bedrijfSelect').value,
             afspraakDatumTijd: document.getElementById('afspraakDatumTijd').value,
             startDatumTijd: document.getElementById('startDatumTijd').value,
             haalAdres: document.getElementById('haalAdres').value,
-            extraDatumTijd: document.getElementById('extraDatumTijd').value,
-            extraAdres: document.getElementById('extraAdres').value,
+            extraAdressen: extraLijst.join(' | '), // Voegt alle extra adressen samen met een scheidingsteken
             stopDatumTijd: document.getElementById('stopDatumTijd').value,
             brengAdres: document.getElementById('brengAdres').value,
             herhaling: document.getElementById('herhaling').value,
@@ -248,8 +251,9 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+            statusDiv.innerText = "✅ Succesvol opgeslagen in Google Sheets!";
         } catch (e) {
-            console.error("Fout bij verzenden:", e);
+            statusDiv.innerText = "❌ Fout bij opslaan: " + e.message;
         }
     }
 </script>
