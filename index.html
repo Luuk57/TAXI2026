@@ -247,7 +247,8 @@
 </div>
 
 <script>
-    const webhookUrl = 'https://script.google.com/macros/s/AKfycby0Gb9HG6IQCcW2BzWoYYPrBulQmHkmwnJdWmX8isSwNjC0zrCHU9Gz9xkM3K7ckJMr/exec';
+    // Jouw nieuwe en juiste Google Apps Script Web App URL
+    const webhookUrl = 'https://script.google.com/macros/s/AKfycbzgds2s1CVu61suyGbl7bT9OWd8QbJchr-tKEKJG3UMOkl1gAdpYkPLLrwOW_qIUv0Q/exec';
     let extraAdresTeller = 0;
     let globaleRittenData = [];
 
@@ -295,12 +296,11 @@
         return d.toLocaleDateString('nl-NL') + ' ' + d.toLocaleTimeString('nl-NL');
     }
 
-    // Nette datumnotatie maker voor het overzicht
     function meesFormattedDatum(isoStr) {
         if (!isoStr) return '-';
         try {
             const d = new Date(isoStr);
-            if (isNaN(d.getTime())) return isoStr; // Als het al een tekstformaat is
+            if (isNaN(d.getTime())) return isoStr;
             
             const dag = String(d.getDate()).padStart(2, '0');
             const maand = String(d.getMonth() + 1).padStart(2, '0');
@@ -353,7 +353,6 @@
         document.getElementById(`extraAdres_${id}`).value = loc.adres;
     }
 
-    // Nieuwe rit opslaan
     async function opslaanNieuweRit() {
         const statusDiv = document.getElementById('status');
         statusDiv.innerText = "Gegevens verzenden...";
@@ -391,7 +390,6 @@
         }
     }
 
-    // Overzicht inladen
     async function laadOverzicht() {
         const lijstDiv = document.getElementById('rittenLijst');
         lijstDiv.innerText = "Laden...";
@@ -429,7 +427,7 @@
                             <b>Start:</b> ${rit.haalAdres || '-'}<br>
                             <b>Extra:</b> ${rit.extraAdressen || '-'}<br>
                             <b>Stop:</b> ${rit.brengAdres || '-'}<br>
-                            <b>Notitie:</b> ${rit.opmerkingen || '-'}
+                            <b>Notitie:</b> ${rit.opmerkingen || '-'}<br>
                         </div>
                         <div class="rit-actions">
                             <button class="btn-edit" onclick="openBewerkModal(${index})">Bewerken</button>
@@ -444,7 +442,6 @@
         }
     }
 
-    // POP-UP BEWERKEN
     function openBewerkModal(index) {
         const rit = globaleRittenData[index];
         document.getElementById('editRowIndex').value = rit.rowIndex;
@@ -461,7 +458,6 @@
         document.getElementById('bewerkModal').style.display = 'none';
     }
 
-    // Opslaan vanuit Pop-up
     async function opslaanBewerking() {
         const rowIndex = document.getElementById('editRowIndex').value;
         const payload = {
